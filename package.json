@@ -1,0 +1,11 @@
+{
+  "name": "12factorial",
+  "version": "0.3.0",
+  "description": "A library for consuming config from environment variables and Consul",
+  "main": "index.js",
+  "scripts": {
+    "test": "node_modules/jasmine/bin/jasmine.js test/index.js"
+  },
+  "author": "Bob Gregory",
+  "license": "MIT"
+}
