@@ -1,11 +1,24 @@
 {
   "name": "12factorial",
   "version": "0.3.0",
+  "repository": {
+    "type": "git",
+    "url":  "https://github.com/bobthemighty/12factorial"
+  },
+  "keywords": [
+    "consul",
+    "configuration",
+    "environment"
+  ],
   "description": "A library for consuming config from environment variables and Consul",
   "main": "index.js",
   "scripts": {
     "test": "node_modules/jasmine/bin/jasmine.js test/index.js"
   },
-  "author": "Bob Gregory",
-  "license": "MIT"
+  "author": "Bob Gregory <bob@codefiend.co.uk>",
+  "license": "MIT",
+  "dependencies": {
+    "consul": "^0.28.0",
+    "jasmine": "^2.5.3"
+  }
 }
