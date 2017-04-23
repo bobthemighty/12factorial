@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "repository": {
     "type": "git",
-    "url":  "https://github.com/bobthemighty/12factorial"
+    "url": "https://github.com/bobthemighty/12factorial"
   },
   "keywords": [
     "consul",
@@ -18,7 +18,9 @@
   "author": "Bob Gregory <bob@codefiend.co.uk>",
   "license": "MIT",
   "dependencies": {
-    "consul": "^0.28.0",
+    "consul": "^0.28.0"
+  },
+  "devDependencies": {
     "jasmine": "^2.5.3"
   }
 }
