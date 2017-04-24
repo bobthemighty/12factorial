@@ -28,7 +28,7 @@ function _Value(opts) {
     var envValue = process.env[prefixed];
 
     if (envValue !== undefined) {
-      if (this.sensitive) {
+      if (this.opts.sensitive) {
         builderOpts.log.info("Setting " + varname + " to env var " + prefixed);
       } else {
         builderOpts.log.info("Setting " + varname + " to " +envValue + " from env var " + prefixed);
@@ -38,7 +38,7 @@ function _Value(opts) {
     } else if (builderOpts.consul.prefix && builderOpts.enableconsul) {
         this.applyConsulWatch(client, path, key, target, builderOpts);
     } else {
-      if (this.sensitive) {
+      if (this.opts.sensitive) {
         builderOpts.log.info("Setting " + varname + " to default value");
       } else {
          builderOpts.log.info("Setting " + varname + " to default value '" + opts.default+"'");
@@ -53,10 +53,11 @@ function _Value(opts) {
     var keyPath = [builderOpts.consul.prefix].concat(path).concat([key]).join('/');
     var watch = client.watch({ method: client.kv.get, options: { key: keyPath }});
     var _default = this.opts.default;
+    var _sensitive = this.opts.sensitive;
     watch.on('change', function(data, res) {
       var prev = target[key];
       if (res.statusCode == 200 && data && data.Value) {
-        if (this.sensitive) {
+        if (_sensitive) {
           builderOpts.log.info("Setting " + varname + " to consul kv " + keyPath);
         } else {
           builderOpts.log.info("Setting " + varname + " to " + data.Value + " from consul kv " + keyPath);
@@ -75,6 +76,11 @@ function _Value(opts) {
 function _Service (name, opts) {
   this.opts = opts;
   this.service = name;
+
+  this.extend = function(o) {
+    this.extensions = o;
+    return this;
+  }
 
   this.apply = function (client, path, key, target, builderOpts) {
     var addrVarname = path.concat([key, 'ADDRESS'])
@@ -107,15 +113,13 @@ function _Service (name, opts) {
 
   this.applyConsulWatch = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]).join('.');
-    var keyPath = [builderOpts.consul.prefix].concat(path).concat([key]).join('/');
     var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
     watch.on('change', function(data, res) {
-
       var prev = target[key];
       if (res.statusCode == 200 && data) {
         var item = data[Math.floor(Math.random()*data.length)]
-        target[key] = new _ServiceValue(item.ServiceAddress, item.ServicePort)
+        Object.assign(target[key], new _ServiceValue(item.ServiceAddress, item.ServicePort));
         builderOpts.emitter.emit('change', varname, item, prev);
       } else {
         target[key] = _default;
@@ -152,7 +156,11 @@ function _buildRecursive (client, target, spec, opts, path) {
     if (val instanceof _Value) {
       val.apply(client, path, key, target, opts);
     } else if (val instanceof _Service) {
+      target[key] = {};
       val.apply(client, path, key, target, opts);
+      if (val.extensions) {
+        _buildRecursive(client, target[key], val.extensions, opts, path.concat([key]));
+      }
     } else  if (_isObject(val)) {
       target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]));
     } else {

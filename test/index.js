@@ -1,16 +1,9 @@
 var consul = require('consul')({promisify: true});
 var config = require('../index');
-var nock = require('nock');
-
-var defaultHeaders = {
-    'x-consul-index': '666',
-    'x-consul-lastcontact': '10',
-    'x-consul-knownleader': 'true',
-    'x-consul-translate-addresses': 'true'
-  };
 
 var cfg = {
   value: config.value({optional: true}),
+  hardcoded: 'hello world',
   valueWithDefault: config.value({default: 123}),
   nested: {
     value: config.value({optional: true})
@@ -21,6 +14,16 @@ var cfg = {
     }
   }
 }
+
+describe('When a field is hard-coded', function () {
+
+  it('should use the static value', function (done) {
+    config.build(cfg).then(function(result) {
+      expect(result.hardcoded).toBe('hello world');
+      done();
+    });
+  });
+});
 
 describe('When an env var is present', function() {
 
@@ -225,7 +228,7 @@ describe('When consul is not reachable but values are present in the environment
     }}).then(function(v) {
       result = v;
       done();
-    }).catch(function (e) { console.log("FEERERE", e) });
+    });
   });
 
   it('Should return a complete config object', function () {
@@ -239,4 +242,88 @@ describe('When consul is not reachable but values are present in the environment
     delete process.env.MYSERVICE_ADDRESS;
     delete process.env.MYSERVICE_PORT;
   });
+});
+
+describe('When extending a service', function () {
+
+  var cfg = {
+    myservice: config.service('12factorial-extension-test').extend({
+        password: config.value({sensitive: true}),
+        username: config.value()
+    })
+  };
+
+  describe('When vars are available in the environment', function () {
+
+    var result;
+
+    beforeEach(function (done) {
+
+      process.env.MYSERVICE_USERNAME = 'rubidium';
+      process.env.MYSERVICE_PASSWORD = 'babylonian';
+      process.env.MYSERVICE_ADDRESS = '10.128.8.22';
+      process.env.MYSERVICE_PORT = 8901;
+
+      config.build(cfg).then(function(v) {
+        result = v;
+        done();
+      }).catch(function(e){ console.log(e);  });
+    });
+
+
+    it('Should have fetched the service vars', function () {
+      expect(result.myservice.getAddress()).toBe('10.128.8.22:8901')
+    });
+
+    it('Should have set the password', function () {
+      expect(result.myservice.password).toBe('babylonian')
+    });
+
+    it('Should have set the username', function () {
+      expect(result.myservice.username).toBe('rubidium')
+    });
+
+    afterEach(function () {
+      delete process.env.MYSERVICE_USERNAME;
+      delete process.env.MYSERVICE_PASSWORD;
+      delete process.env.MYSERVICE_ADDRESS;
+      delete process.env.MYSERVICE_PORT;
+    });
+  });
+
+  describe('When vars are available in consul', function () {
+
+    var result;
+
+    beforeEach(function (done) {
+      process.env.MYSERVICE_PASSWORD = 'babylonian';
+      consul.agent.service.register({
+        id: "12factorial-extension-test",
+        name: "12factorial-extension-test",
+        address: "10.128.31.32",
+        port: 9876
+      }).then(function() {
+       return consul.kv.set('12factorial/myservice/username', 'copper king')
+      }).then(function () {
+        return config.build(cfg, { consul:{ prefix: '12factorial' }});
+      }).then(function(v) {
+        result = v;
+        done();
+      }).catch(function(e){ console.log(e);  });
+    });
+
+
+    it('Should have fetched the service vars', function () {
+      expect(result.myservice.getAddress()).toBe('10.128.31.32:9876')
+    });
+
+    it('Should have set the password', function () {
+      expect(result.myservice.password).toBe('babylonian')
+    });
+
+    it('Should have set the username', function () {
+      expect(result.myservice.username).toBe('copper king')
+    });
+  });
+
 });
