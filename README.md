@@ -28,7 +28,7 @@ const spec = {
 
 // 12factorial.build is the factory function that turns your
 // object into a synchronised config object
-const config = cfg.build(spec)
+cfg.build(spec).then((x) => doSomethingWithConfig(x))
 ```
 
 ## Using values
@@ -67,9 +67,9 @@ spec = {
 
 process.env.MYAPP_NESTED_VALUE = 'beep'
 
-const config = cfg.build(spec, {envPrefix: 'myapp'})
-
-console.log(config.nested.value) // prints beep
+cfg.build(spec, {envPrefix: 'myapp'}).then(config => { 
+    console.log(config.nested.value) // prints beep
+});
 ```
 
 ### Syncing with consul
@@ -92,9 +92,9 @@ const spec = {
     }
 }
 
-const config = cfg.build(spec, { consul: consulConfig })
-
-console.log(config.nested.value) // prints the value of myapp/nested/value from consul kv.
+cfg.build(spec, { consul: consulConfig }).then( config => {
+        console.log(config.nested.value) // prints the value of myapp/nested/value from consul kv.
+});
 ```
 
 ## Using Services
@@ -110,7 +110,7 @@ const spec = {
 process.env.MYAPP_WEB_ADDRESS = '127.0.0.1'
 process.env.MYAPP_WEB_PORT = '3002'
 
-const config = cfg.build(spec, { envPrefix: 'myapp' })
+const config = await cfg.build(spec, { envPrefix: 'myapp' })
 
 console.log(config.web.getAddress())             // prints 127.0.0.1:3002
 console.log(config.web.buildUri('/hello/world')) // prints 127.0.0.1:3002/hello/world
