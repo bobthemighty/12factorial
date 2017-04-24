@@ -10,10 +10,10 @@ var defaultHeaders = {
   };
 
 var cfg = {
-  value: config.value(),
+  value: config.value({optional: true}),
   valueWithDefault: config.value({default: 123}),
   nested: {
-    value: config.value()
+    value: config.value({optional: true})
   },
   db: {
     credentials: {
@@ -28,9 +28,11 @@ describe('When an env var is present', function() {
     process.env.VALUE = 'tomato'
   });
 
-  it('should be set on the config', function () {
-    var result = config.build(cfg)
-    expect(result.value).toBe('tomato')
+  it('should be set on the config', function (done) {
+    config.build(cfg).then(function(result) {
+      expect(result.value).toBe('tomato')
+      done();
+    });
   });
 
   afterEach(function () { delete process.env.VALUE });
@@ -42,9 +44,11 @@ describe('When an env var is present for a nested key', function () {
     process.env.NESTED_VALUE = 'potato'
   });
 
-  it('should be set on the config', function () {
-    var result = config.build(cfg)
-    expect(result.nested.value).toBe('potato')
+  it('should be set on the config', function (done) {
+    config.build(cfg).then(function(result) {
+      expect(result.nested.value).toBe('potato');
+      done();
+    });
   });
 
   afterEach(function () { delete process.env.NESTED_VALUE });
@@ -53,8 +57,9 @@ describe('When an env var is present for a nested key', function () {
 describe('When a value has a default', function () {
 
   it('should be set on the config', function () {
-    var result = config.build(cfg)
-    expect(result.valueWithDefault).toBe(123)
+    config.build(cfg).then(function (result) {
+      expect(result.valueWithDefault).toBe(123);
+    });
   })
 
 })
@@ -66,8 +71,9 @@ describe('When a defaulted value is set by environment variable', function () {
   })
 
   it('should use the environment value', function () {
-    var result = config.build(cfg)
-    expect(result.db.credentials.username).toBe('rootato')
+    config.build(cfg).then(function (result) {
+      expect(result.db.credentials.username).toBe('rootato');
+    });
   })
 
   afterEach(function () { delete process.env.DB_CREDENTIALS_USERNAME });
@@ -80,8 +86,9 @@ describe('When a prefix is set', function () {
   })
 
   it('should use the environment value', function () {
-    var result = config.build(cfg, {envPrefix: 'myapp'})
-    expect(result.db.credentials.username).toBe('sausages')
+    config.build(cfg, {envPrefix: 'myapp'}).then(function (result) {
+      expect(result.db.credentials.username).toBe('sausages');
+    });
   })
 
   afterEach(function () { delete process.env.MYAPP_DB_CREDENTIALS_USERNAME });
@@ -94,21 +101,18 @@ describe('When a value is present in consul', function () {
   }
 
   it('should use the value from consul', function(done) {
-    var result = config.build(consulCfg, {consulPrefix: 'myapp'})
-    setTimeout(function() {
-      expect(result.value).toBe('saussignac')
-      done();
-    }, 100);
+    config.build(consulCfg, {consulPrefix: 'myapp'})
+      .then(function (result){
+        expect(result.value).toBe('saussignac');
+        done();
+      });
   })
 })
-
 describe('When a service is defined by env vars', function () {
 
   var cfg = {
     db: config.service('12factorial-test')
   }
-
-  var result = {};
 
   beforeEach(function() {
     process.env.DB_ADDRESS = '10.128.64.32'
@@ -116,23 +120,27 @@ describe('When a service is defined by env vars', function () {
   })
 
   it('should be able to return the address', function () {
-    var result = config.build(cfg)
-    expect(result.db.getAddress()).toBe('10.128.64.32:5432')
+    config.build(cfg).then(function (result) {
+      expect(result.db.getAddress()).toBe('10.128.64.32:5432')
+    });
   })
 
   it('should be able to return the port', function () {
-    var result = config.build(cfg)
-    expect(result.db.port).toBe(5432)
+    config.build(cfg).then(function (result) {
+      expect(result.db.port).toBe(5432);
+    });
   })
 
   it('should be able to return the address', function () {
-    var result = config.build(cfg)
-    expect(result.db.address).toBe('10.128.64.32')
+    config.build(cfg).then( function(result) {
+      expect(result.db.address).toBe('10.128.64.32');
+    });
   })
 
   it('should be able to build a uri', function () {
-    var result = config.build(cfg)
-    expect(result.db.buildUri('foo')).toBe('10.128.64.32:5432/foo')
+    config.build(cfg).then(function(result) {
+      expect(result.db.buildUri('foo')).toBe('10.128.64.32:5432/foo');
+    });
   })
 
   afterEach(function () {
@@ -144,7 +152,7 @@ describe('When a service is defined by env vars', function () {
 describe('When a service is present in consul', function () {
 
   var cfg = {
-    db: config.service('12factorial-test')
+    myservice: config.service('12factorial-test')
   }
 
   var result;
@@ -156,27 +164,24 @@ describe('When a service is present in consul', function () {
       address: "10.128.64.32",
       port: 1234
     }).then(function() {
-      result = config.build(cfg);
-      setTimeout(function() {
-        done();
-      }, 100);
-    });
+      return config.build(cfg);
+    }).then(function (v) { result = v; done();});
   });
 
    it('should be able to return the address', function () {
-    expect(result.db.getAddress()).toBe('10.128.64.32:1234')
+    expect(result.myservice.getAddress()).toBe('10.128.64.32:1234')
   })
 
   it('should be able to return the port', function () {
-    expect(result.db.port).toBe(1234)
+    expect(result.myservice.port).toBe(1234)
   })
 
   it('should be able to return the address', function () {
-    expect(result.db.address).toBe('10.128.64.32')
+    expect(result.myservice.address).toBe('10.128.64.32')
   })
 
   it('should be able to build a uri', function () {
-    expect(result.db.buildUri('foo')).toBe('10.128.64.32:1234/foo')
+    expect(result.myservice.buildUri('foo')).toBe('10.128.64.32:1234/foo')
   })
 
 
