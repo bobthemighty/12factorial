@@ -125,6 +125,28 @@ Services are automatically synchronised from Consul. By default, we use 'http://
 
 If there are multiple addresses registered for a service, 12factorial will select an address at random and return that address consistently until the service is updated in Consul.
 
+
+### Mixing Values into Services
+
+Occasionally, for ease of consumption, you might want to add extra values into a service object. This is typically useful for storing credentials with a service's address. This use case is covered by the `extend` method of a `service`.
+
+
+```
+
+const spec = {
+    database: cfg.service('myapp-db').extend({
+        username: cfg.value(),
+        password: cfg.value({ sensitive: true })
+    })
+}   
+
+const config = await cfg.build(spec)
+
+console.log(config.database.getAddress())
+console.log(config.database.username)
+console.log(config.database.password)
+```
+
 ## Current Status
 
 This is alpha-quality. There are some missing features, and little error handling. This is intended to meet my own requirements for a production system, but may not meet yours. Feel free to play around and report bugs. 
