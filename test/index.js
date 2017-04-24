@@ -85,10 +85,10 @@ describe('When a prefix is set', function () {
     process.env.MYAPP_DB_CREDENTIALS_USERNAME = 'sausages'
   })
 
-  it('should use the environment value', function () {
+  it('should use the environment value', function (done) {
     config.build(cfg, {envPrefix: 'myapp'}).then(function (result) {
       expect(result.db.credentials.username).toBe('sausages');
-    });
+    }).then(done);
   })
 
   afterEach(function () { delete process.env.MYAPP_DB_CREDENTIALS_USERNAME });
@@ -119,28 +119,28 @@ describe('When a service is defined by env vars', function () {
     process.env.DB_PORT = 5432
   })
 
-  it('should be able to return the address', function () {
+  it('should be able to return the address', function (done) {
     config.build(cfg).then(function (result) {
       expect(result.db.getAddress()).toBe('10.128.64.32:5432')
-    });
+    }).then(done);
   })
 
-  it('should be able to return the port', function () {
+  it('should be able to return the port', function (done) {
     config.build(cfg).then(function (result) {
       expect(result.db.port).toBe(5432);
-    });
+    }).then(done);
   })
 
-  it('should be able to return the address', function () {
+  it('should be able to return the address', function (done) {
     config.build(cfg).then( function(result) {
       expect(result.db.address).toBe('10.128.64.32');
-    });
+    }).then(done);
   })
 
-  it('should be able to build a uri', function () {
+  it('should be able to build a uri', function (done) {
     config.build(cfg).then(function(result) {
       expect(result.db.buildUri('foo')).toBe('10.128.64.32:5432/foo');
-    });
+    }).then(done);
   })
 
   afterEach(function () {
@@ -165,7 +165,7 @@ describe('When a service is present in consul', function () {
       port: 1234
     }).then(function() {
       return config.build(cfg);
-    }).then(function (v) { result = v; done();});
+    }).then(function (v) { result = v; done();}).catch(function (e) { console.log("HITE", e) });
   });
 
    it('should be able to return the address', function () {
@@ -184,5 +184,42 @@ describe('When a service is present in consul', function () {
     expect(result.myservice.buildUri('foo')).toBe('10.128.64.32:1234/foo')
   })
 
-
 })
+
+describe('When consul is not reachable but values are present in the environment', function () {
+
+  var cfg = {
+    myvalue: config.value(),
+    myservice: config.service('foo')
+  };
+
+  var result;
+
+  beforeEach(function (done) {
+
+    process.env.MYVALUE = 'frustrum';
+    process.env.MYSERVICE_ADDRESS = '10.128.8.21';
+    process.env.MYSERVICE_PORT = 8401;
+    process.env.MYVALUE = 'frustrum';
+
+    config.build(cfg, { consul: {
+      host: 'not-a-real-host.local',
+      prefix: 'myservice'
+    }}).then(function(v) {
+      result = v;
+      done();
+    }).catch(function (e) { console.log("FEERERE", e) });
+  });
+
+  it('Should return a complete config object', function () {
+    expect(result.myvalue).toBe('frustrum');
+    expect(result.myservice.port).toBe(8401);
+    expect(result.myservice.address).toBe('10.128.8.21');
+  });
+
+  afterEach(function () {
+    delete process.env.MYVALUE;
+    delete process.env.MYSERVICE_ADDRESS;
+    delete process.env.MYSERVICE_PORT;
+  });
+});

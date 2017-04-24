@@ -1,10 +1,17 @@
-var consul = require ('consul')({ promisify: true })
+var consul = require ('consul');
 var events = require('events');
+
+var _defaultLogger = {
+  debug: function(m) { console.log("12factor@debug: " +m); },
+  info: function(m) { console.log("12factor@info: " +m); },
+  warn: function(m) { console.log("12factor@warn: " +m); },
+  error: function(m) { console.log("12factor@error: " +m); },
+}
 
 function _Value(opts) {
   this.opts = opts;
 
-  this.apply = function (path, key, target, builderOpts) {
+  this.apply = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]);
     var prefixed = path.concat([key]);
     varname = varname.join('.');
@@ -22,18 +29,18 @@ function _Value(opts) {
     if (envValue !== undefined) {
       target[key] = envValue;
       builderOpts.emitter.emit('change', varname, envValue, undefined);
-    } else if (builderOpts.consulPrefix) {
-        this.applyConsulWatch(path, key, target, builderOpts);
+    } else if (builderOpts.consulPrefix && builderOpts.enableconsul) {
+        this.applyConsulWatch(client, path, key, target, builderOpts);
     } else {
       target[key] = this.opts.default;
       builderOpts.emitter.emit('change', varname, opts.default, undefined);
     }
   }
 
-  this.applyConsulWatch = function (path, key, target, builderOpts) {
+  this.applyConsulWatch = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]).join('.');
     var keyPath = [builderOpts.consulPrefix].concat(path).concat([key]).join('/');
-    var watch = consul.watch({ method: consul.kv.get, options: { key: keyPath }});
+    var watch = client.watch({ method: client.kv.get, options: { key: keyPath }});
     var _default = this.opts.default;
     watch.on('change', function(data, res) {
       var prev = target[key];
@@ -52,7 +59,7 @@ function _Service (name, opts) {
   this.opts = opts;
   this.service = name;
 
-  this.apply = function (path, key, target, builderOpts) {
+  this.apply = function (client, path, key, target, builderOpts) {
     var addrVar = path.concat([key, 'ADDRESS'])
     var portVar = path.concat([key, 'PORT'])
     var varname = path.concat([key]).join('.');
@@ -72,15 +79,15 @@ function _Service (name, opts) {
     if (addrVar !== undefined && portVar !== undefined) {
       target[key] = new _ServiceValue(addrVar, portVar)
       builderOpts.emitter.emit('change', varname, target[key], undefined);
-    } else {
-       this.applyConsulWatch(path, key, target, builderOpts)
+    } else if(builderOpts.enableconsul) {
+       this.applyConsulWatch(client, path, key, target, builderOpts)
     }
   }
 
-  this.applyConsulWatch = function (path, key, target, builderOpts) {
+  this.applyConsulWatch = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]).join('.');
     var keyPath = [builderOpts.consulPrefix].concat(path).concat([key]).join('/');
-    var watch = consul.watch({ method: consul.catalog.service.nodes, options: { service: this.service }});
+    var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
     watch.on('change', function(data, res) {
 
@@ -118,30 +125,33 @@ function _isObject(o) {
   return true;
 }
 
-function _buildRecursive (target, spec, opts, path) {
+function _buildRecursive (client, target, spec, opts, path) {
   for(var key in spec){
     var val = spec[key]
     if (val instanceof _Value) {
-      val.apply(path, key, target, opts);
+      val.apply(client, path, key, target, opts);
     } else if (val instanceof _Service) {
-      val.apply(path, key, target, opts);
+      val.apply(client, path, key, target, opts);
     } else  if (_isObject(val)) {
-      target[key] = _buildRecursive({}, spec[key], opts, path.concat([key]));
+      target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]));
+    } else {
+      target[key] = val;
     }
   }
   return target;
 }
 
-
-
 module.exports.build = function (spec, opts){
   if (opts === undefined) { opts = {}; }
+  if (!opts.consul) { opts.consul = {}; }
+  if (!opts.log) { opts.log = _defaultLogger; }
+
+  opts.consul.promisify = true;
   opts.emitter = new events.EventEmitter();
   opts.required = {};
 
   function changeHandler (target, resolve, reject) {
-    var _handle = function(name, v, old) {
-      console.log(name + " changed from " + old + " to " +v);
+    var _handle  = function (name , v, old) {
       opts.required[name] = false;
       var hasMissing = false;
 
@@ -155,12 +165,22 @@ module.exports.build = function (spec, opts){
     return _handle
   }
 
+  var client = consul(opts.consul);
 
-  return new Promise(function(resolve, reject) {
-    var target = {};
-    opts.emitter.on('change', changeHandler(target, resolve, reject));
-    _buildRecursive(target, spec, opts || {}, []);
-  }).catch(function(e){ console.log(e) });
+  return client.agent.self()
+    .then(function (data) {
+      opts.log.info("Connected to consul node "+data.Config.NodeName);
+      opts.enableconsul = true;
+    }).catch(function (e) {
+      opts.log.warn("Failed to connect to consul at "+opts.consul.host, e);
+      opts.enableconsul = false;
+    }).then(function() {
+      return new Promise(function(resolve, reject) {
+        var target = {};
+        opts.emitter.on('change', changeHandler(target, resolve, reject));
+        _buildRecursive(client, target, spec, opts || {}, []);
+      });
+    });
 }
 
 module.exports.value = function (opts){
