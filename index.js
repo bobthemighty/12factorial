@@ -115,15 +115,18 @@ function _Service (name, opts) {
     var varname = path.concat([key]).join('.');
     var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
+    var _service = this.opts.service;
     watch.on('change', function(data, res) {
       var prev = target[key];
-      if (res.statusCode == 200 && data) {
+      if (res.statusCode == 200 && data.length) {
         var item = data[Math.floor(Math.random()*data.length)]
         Object.assign(target[key], new _ServiceValue(item.ServiceAddress, item.ServicePort));
         builderOpts.emitter.emit('change', varname, item, prev);
       } else {
+        builderOpts.log.warn('No data returned from consul for service '+_service);
         target[key] = _default;
-        builderOpts.emitter.emit('change', varname, _default, prev);
+        if (_dfault !== undefined)
+          builderOpts.emitter.emit('change', varname, _default, prev);
       }
     })
   }
