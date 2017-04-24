@@ -9,29 +9,40 @@ var _defaultLogger = {
 }
 
 function _Value(opts) {
+
   this.opts = opts;
 
   this.apply = function (client, path, key, target, builderOpts) {
-    var varname = path.concat([key]);
-    var prefixed = path.concat([key]);
-    varname = varname.join('.');
 
+    var varname = path.concat([key]).join('.');
     if (! this.opts.optional) {
       builderOpts.required[varname] = true;
     }
 
+    var prefixed = path.concat([key]);
     if (builderOpts.envPrefix) {
       prefixed.unshift(builderOpts.envPrefix);
     }
+    prefixed = prefixed.join('_').toUpperCase();
 
-    var envValue = process.env[(prefixed.join('_')).toUpperCase()];
+    var envValue = process.env[prefixed];
 
     if (envValue !== undefined) {
+      if (this.sensitive) {
+        builderOpts.log.info("Setting " + varname + " to env var " + prefixed);
+      } else {
+        builderOpts.log.info("Setting " + varname + " to " +envValue + " from env var " + prefixed);
+      }
       target[key] = envValue;
       builderOpts.emitter.emit('change', varname, envValue, undefined);
     } else if (builderOpts.consul.prefix && builderOpts.enableconsul) {
         this.applyConsulWatch(client, path, key, target, builderOpts);
     } else {
+      if (this.sensitive) {
+        builderOpts.log.info("Setting " + varname + " to default value");
+      } else {
+         builderOpts.log.info("Setting " + varname + " to default value '" + opts.default+"'");
+      }
       target[key] = this.opts.default;
       builderOpts.emitter.emit('change', varname, opts.default, undefined);
     }
@@ -45,9 +56,15 @@ function _Value(opts) {
     watch.on('change', function(data, res) {
       var prev = target[key];
       if (res.statusCode == 200 && data && data.Value) {
+        if (this.sensitive) {
+          builderOpts.log.info("Setting " + varname + " to consul kv " + keyPath);
+        } else {
+          builderOpts.log.info("Setting " + varname + " to " + data.Value + " from consul kv " + keyPath);
+        }
         target[key] = data.Value;
         builderOpts.emitter.emit('change', varname, data.Value, prev);
       } else {
+        builderOpts.log.warn("Received status code " + res.statusCode +", data= " + data + " for kv " +keyPath+ ". Falling back to default value '"+_default+"'");
         target[key] = _default;
         builderOpts.emitter.emit('change', varname, _default, prev);
       }
@@ -60,8 +77,8 @@ function _Service (name, opts) {
   this.service = name;
 
   this.apply = function (client, path, key, target, builderOpts) {
-    var addrVar = path.concat([key, 'ADDRESS'])
-    var portVar = path.concat([key, 'PORT'])
+    var addrVarname = path.concat([key, 'ADDRESS'])
+    var portVarname = path.concat([key, 'PORT'])
     var varname = path.concat([key]).join('.');
 
     if (! this.opts.optional) {
@@ -69,14 +86,18 @@ function _Service (name, opts) {
     }
 
     if (builderOpts.envPrefix) {
-      addrVar.unshift(builderOpts.envPrefix)
-      portVar.unshift(builderOpts.envPrefix)
+      addrVarname.unshift(builderOpts.envPrefix)
+      portVarname.unshift(builderOpts.envPrefix)
     }
 
-    addrVar = process.env[addrVar.join('_').toUpperCase()]
-    portVar = parseInt(process.env[portVar.join('_').toUpperCase()])
+    addrVarname = addrVarname.join('_').toUpperCase();
+    portVarname = portVarname.join('_').toUpperCase();
+
+    addrVar = process.env[addrVarname]
+    portVar = parseInt(process.env[portVarname])
 
     if (addrVar !== undefined && portVar !== undefined) {
+      builderOpts.log.info("Setting service " + this.service + " to "+ addrVar +":" + portVar + " from env vars " + addrVarname +", "+portVarname);
       target[key] = new _ServiceValue(addrVar, portVar)
       builderOpts.emitter.emit('change', varname, target[key], undefined);
     } else if(builderOpts.enableconsul) {

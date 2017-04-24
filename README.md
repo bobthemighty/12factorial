@@ -131,7 +131,7 @@ This is alpha-quality. There are some missing features, and little error handlin
 
 ## Roadmap
 
-- [ ] Add logging
+- [X] Add logging
 - [ ] Make sure we handle errors properly
 - [ ] Add type coercion for values
 - [ ] Allow consul values to query using data center, tags etc.

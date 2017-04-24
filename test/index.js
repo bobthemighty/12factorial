@@ -101,13 +101,30 @@ describe('When a value is present in consul', function () {
   }
 
   it('should use the value from consul', function(done) {
-    config.build(consulCfg, {consul.prefix: 'myapp'})
+    config.build(consulCfg, {consul: {prefix: 'myapp'}})
       .then(function (result){
         expect(result.value).toBe('saussignac');
         done();
       });
   })
 })
+
+describe('When a value is missing in consul but has a default', function () {
+
+  var consulCfg = {
+    value: config.value({default: 'fluster'})
+  }
+
+  it('should use the value from consul', function(done) {
+    config.build(consulCfg, {consul: {prefix: 'myotherapp'}})
+      .then(function (result){
+        expect(result.value).toBe('fluster');
+        done();
+      });
+  })
+})
+
+
 describe('When a service is defined by env vars', function () {
 
   var cfg = {
