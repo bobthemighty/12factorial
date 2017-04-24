@@ -29,7 +29,7 @@ function _Value(opts) {
     if (envValue !== undefined) {
       target[key] = envValue;
       builderOpts.emitter.emit('change', varname, envValue, undefined);
-    } else if (builderOpts.consulPrefix && builderOpts.enableconsul) {
+    } else if (builderOpts.consul.prefix && builderOpts.enableconsul) {
         this.applyConsulWatch(client, path, key, target, builderOpts);
     } else {
       target[key] = this.opts.default;
@@ -39,7 +39,7 @@ function _Value(opts) {
 
   this.applyConsulWatch = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]).join('.');
-    var keyPath = [builderOpts.consulPrefix].concat(path).concat([key]).join('/');
+    var keyPath = [builderOpts.consul.prefix].concat(path).concat([key]).join('/');
     var watch = client.watch({ method: client.kv.get, options: { key: keyPath }});
     var _default = this.opts.default;
     watch.on('change', function(data, res) {
@@ -86,7 +86,7 @@ function _Service (name, opts) {
 
   this.applyConsulWatch = function (client, path, key, target, builderOpts) {
     var varname = path.concat([key]).join('.');
-    var keyPath = [builderOpts.consulPrefix].concat(path).concat([key]).join('/');
+    var keyPath = [builderOpts.consul.prefix].concat(path).concat([key]).join('/');
     var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
     watch.on('change', function(data, res) {
