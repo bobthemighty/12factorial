@@ -115,7 +115,7 @@ function _Service (name, opts) {
     var varname = path.concat([key]).join('.');
     var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
-    var _service = this.opts.service;
+    var _service = this.service;
     watch.on('change', function(data, res) {
       var prev = target[key];
       if (res.statusCode == 200 && data.length) {
@@ -125,7 +125,7 @@ function _Service (name, opts) {
       } else {
         builderOpts.log.warn('No data returned from consul for service '+_service);
         target[key] = _default;
-        if (_dfault !== undefined)
+        if (_default !== undefined)
           builderOpts.emitter.emit('change', varname, _default, prev);
       }
     })
