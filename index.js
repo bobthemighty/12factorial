@@ -8,9 +8,31 @@ var _defaultLogger = {
   error: function(m) { console.log("12factor@error: " +m); },
 }
 
+function id (x) { return x }
+
+function readBool (x) {
+  if(x == "false") {
+    return false;
+  }
+
+  return !!x;
+}
+
+var readerOf = function (value) {
+
+  switch(typeof value) {
+    case 'number':
+      return parseInt;
+    case 'boolean':
+      return readBool
+  }
+  return id
+}
+
 function _Value(opts) {
 
   this.opts = opts;
+  opts.reader = opts.reader || readerOf(this.opts.default)
 
   this.apply = function (client, path, key, target, builderOpts) {
 
@@ -33,7 +55,7 @@ function _Value(opts) {
       } else {
         builderOpts.log.info("Setting " + varname + " to " +envValue + " from env var " + prefixed);
       }
-      target[key] = envValue;
+      target[key] = opts.reader(envValue);
       builderOpts.emitter.emit('change', varname, envValue, undefined);
     } else if (builderOpts.consul.prefix && builderOpts.enableconsul) {
         this.applyConsulWatch(client, path, key, target, builderOpts);
@@ -54,15 +76,16 @@ function _Value(opts) {
     var watch = client.watch({ method: client.kv.get, options: { key: keyPath }});
     var _default = this.opts.default;
     var _sensitive = this.opts.sensitive;
+    var _reader = this.opts.reader;
     watch.on('change', function(data, res) {
       var prev = target[key];
       if (res.statusCode == 200 && data && data.Value) {
         if (_sensitive) {
-          builderOpts.log.info("Setting " + varname + " to consul kv " + keyPath);
+          builderOpts.log.info("Setting " + varname + " to consul kv " + keyPath + "@"+data.ModifyIndex);
         } else {
-          builderOpts.log.info("Setting " + varname + " to " + data.Value + " from consul kv " + keyPath);
+          builderOpts.log.info("Setting " + varname + " to " + data.Value + " from consul kv " + keyPath + '@'+data.ModifyIndex);
         }
-        target[key] = data.Value;
+        target[key] = _reader(data.Value);
         builderOpts.emitter.emit('change', varname, data.Value, prev);
       } else {
         builderOpts.log.warn("Received status code " + res.statusCode +", data= " + data + " for kv " +keyPath+ ". Falling back to default value '"+_default+"'");

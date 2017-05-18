@@ -59,9 +59,10 @@ describe('When an env var is present for a nested key', function () {
 
 describe('When a value has a default', function () {
 
-  it('should be set on the config', function () {
+  it('should be set on the config', function (done) {
     config.build(cfg).then(function (result) {
       expect(result.valueWithDefault).toBe(123);
+      done()
     });
   })
 
@@ -69,18 +70,84 @@ describe('When a value has a default', function () {
 
 describe('When a defaulted value is set by environment variable', function () {
 
-  beforeEach(function() {
+  var result;
+
+  beforeEach(function(done) {
     process.env.DB_CREDENTIALS_USERNAME = 'rootato'
+    process.env.VALUEWITHDEFAULT = '999'
+    config.build(cfg).then(function (r) {
+      result = r;
+      done()
+    })
   })
 
   it('should use the environment value', function () {
-    config.build(cfg).then(function (result) {
-      expect(result.db.credentials.username).toBe('rootato');
-    });
+     expect(result.db.credentials.username).toBe('rootato');
   })
 
-  afterEach(function () { delete process.env.DB_CREDENTIALS_USERNAME });
+  it('should coerce values to the right type', function () {
+    expect(result.valueWithDefault).toBe(999);
+  })
+
+  afterEach(function () {
+    delete process.env.DB_CREDENTIALS_USERNAME;
+    delete process.env.VALUEWITHDEFAULT;
+  });
 })
+
+describe('When reading an env var for a non-string value', function () {
+
+  var result;
+
+  var _const = function (x) { return function() { return x } };
+
+  var cfg = {
+    defaults: {
+        number: config.value({ default: 100 }),
+        string: config.value({ default: 'hello' }),
+        bool: config.value({ default: true })
+    },
+    readers: {
+      number: config.value({ default: 'a string value', reader: parseInt }),
+      bool: config.value({ default: 27, reader: _const(true) }),
+      string: config.value({ default: 100, reader: String })
+    }
+  }
+
+  beforeEach(function(done) {
+
+    process.env.DEFAULTS_NUMBER = '179837'
+    process.env.READERS_NUMBER = '179837'
+
+    process.env.DEFAULTS_STRING = '179837'
+    process.env.READERS_STRING = '179837'
+
+    process.env.DEFAULTS_BOOL = 'false'
+    process.env.READERS_BOOL = 'false'
+
+    config.build(cfg).then(function (x) {
+      result = x;
+      done();
+    });
+  });
+
+
+  it('should parse the integers', function () {
+    expect(result.defaults.number).toBe(179837)
+    expect(result.readers.number).toBe(179837)
+  });
+
+  it('should parse the booleans', function () {
+    expect(result.defaults.bool).toBe(false)
+    expect(result.readers.bool).toBe(true)
+  });
+
+  it('should not parse the strings', function () {
+    expect(result.defaults.string).toBe('179837')
+    expect(result.readers.string).toBe('179837')
+  })
+});
+
 
 describe('When a prefix is set', function () {
 
@@ -325,5 +392,4 @@ describe('When extending a service', function () {
       expect(result.myservice.username).toBe('copper king')
     });
   });
-
 });
