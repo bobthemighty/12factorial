@@ -147,6 +147,29 @@ console.log(config.database.username)
 console.log(config.database.password)
 ```
 
+### Type Coercion
+
+Values can be automagically coerced from strings. If you set a default, we will coerce to the same type as the default value. You can override the parsing of your values by passing a reader function.
+
+```
+const spec = {
+    number: cfg.value({ default: 123 }).
+    bool: cfg.value({ default: true }),
+    custom: cfg.value({ reader: function (x) { return {msg: x } } })
+}   
+
+process.env.NUMBER = "0xFF"
+process.env.BOOL = FALSE // or false
+process.env.CUSTOM = 'Hello World'
+
+const config = await cfg.build(spec)
+
+console.log(config.number) // 255
+console.log(config.bool) // false
+console.log(config.custom.msg) // hello world
+
+```
+
 ## Current Status
 
 This is alpha-quality. There are some missing features, and little error handling. This is intended to meet my own requirements for a production system, but may not meet yours. Feel free to play around and report bugs. 

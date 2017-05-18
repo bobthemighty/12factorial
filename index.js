@@ -11,7 +11,7 @@ var _defaultLogger = {
 function id (x) { return x }
 
 function readBool (x) {
-  if(x == "false") {
+  if(typeof x == "string" && x.toLowerCase() == "false") {
     return false;
   }
 

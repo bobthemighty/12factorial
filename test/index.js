@@ -105,7 +105,8 @@ describe('When reading an env var for a non-string value', function () {
     defaults: {
         number: config.value({ default: 100 }),
         string: config.value({ default: 'hello' }),
-        bool: config.value({ default: true })
+        bool: config.value({ default: true }),
+        boolUpper: config.value({ default: true })
     },
     readers: {
       number: config.value({ default: 'a string value', reader: parseInt }),
@@ -123,6 +124,7 @@ describe('When reading an env var for a non-string value', function () {
     process.env.READERS_STRING = '179837'
 
     process.env.DEFAULTS_BOOL = 'false'
+    process.env.DEFAULTS_BOOLUPPER = 'FALSE'
     process.env.READERS_BOOL = 'false'
 
     config.build(cfg).then(function (x) {
@@ -139,6 +141,7 @@ describe('When reading an env var for a non-string value', function () {
 
   it('should parse the booleans', function () {
     expect(result.defaults.bool).toBe(false)
+    expect(result.defaults.boolUpper).toBe(false)
     expect(result.readers.bool).toBe(true)
   });
 
