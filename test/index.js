@@ -395,4 +395,37 @@ describe('When extending a service', function () {
       expect(result.myservice.username).toBe('copper king')
     });
   });
+
+});
+
+
+describe('When using vault integration', function () {
+
+  describe('When a value in vault is scalar', function () {
+
+    var result;
+
+    var cfg = {
+      creds: config.secret('secret/my-credentials')
+    };
+
+    beforeEach(function (done) {
+      // Write password here plz
+
+      config.build(cfg, { vault: { addr: 'http://localhost:8200' } })
+        .then(function (v) {
+          result = v;
+          done();
+        });
+    });
+
+    it('Should have read the password value', function () {
+      expect(result.creds.password).toBe("Brobdingnag")
+    });
+
+    it('Should have read the username value', function () {
+      expect(result.creds.password).toBe("Lilliput")
+    });
+  });
+
 });
