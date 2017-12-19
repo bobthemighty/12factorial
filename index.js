@@ -143,7 +143,7 @@ function _Service (name, opts) {
       var prev = target[key];
       if (res.statusCode == 200 && data.length) {
         var item = data[Math.floor(Math.random()*data.length)]
-        Object.assign(target[key], new _ServiceValue(item.ServiceAddress, item.ServicePort));
+        Object.assign(target[key], new _ServiceValue(item.ServiceAddress || item.Address, item.ServicePort));
         builderOpts.emitter.emit('change', varname, item, prev);
       } else {
         builderOpts.log.warn('No data returned from consul for service '+_service);
