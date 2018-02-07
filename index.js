@@ -74,6 +74,7 @@ function _Value(opts) {
     var varname = path.concat([key]).join('.');
     var keyPath = [builderOpts.consul.prefix].concat(path).concat([key]).join('/');
     var watch = client.watch({ method: client.kv.get, options: { key: keyPath }});
+    builderOpts.watches.push(watch);
     var _default = this.opts.default;
     var _sensitive = this.opts.sensitive;
     var _reader = this.opts.reader;
@@ -139,6 +140,7 @@ function _Service (name, opts) {
     var watch = client.watch({ method: client.catalog.service.nodes, options: { service: this.service }});
     var _default = this.opts.default;
     var _service = this.service;
+    builderOpts.watches.push(watch);
     watch.on('change', function(data, res) {
       var prev = target[key];
       if (res.statusCode == 200 && data.length) {
@@ -176,7 +178,7 @@ function _isObject(o) {
   return true;
 }
 
-function _buildRecursive (client, target, spec, opts, path, watches, is_top) {
+function _buildRecursive (client, target, spec, opts, path) {
   for(var key in spec){
     var val = spec[key]
     if (val instanceof _Value) {
@@ -185,16 +187,13 @@ function _buildRecursive (client, target, spec, opts, path, watches, is_top) {
       target[key] = {};
       val.apply(client, path, key, target, opts);
       if (val.extensions) {
-        _buildRecursive(client, target[key], val.extensions, opts, path.concat([key]), watches, false);
+        _buildRecursive(client, target[key], val.extensions, opts, path.concat([key]));
       }
     } else  if (_isObject(val)) {
-      target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]), watches, false);
+      target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]));
     } else {
       target[key] = val;
     }
-  }
-  if (is_top) {
-    target.__watches = watches
   }
   return target;
 }
@@ -207,6 +206,7 @@ module.exports.build = function (spec, opts){
   opts.consul.promisify = true;
   opts.emitter = new events.EventEmitter();
   opts.required = {};
+  opts.watches = [];
 
   function changeHandler (target, resolve, reject) {
     var _handle  = function (name , v, old) {
@@ -217,6 +217,7 @@ module.exports.build = function (spec, opts){
         hasMissing |= opts.required[val];
       }
       if(! hasMissing) {
+        target.__watches__ = opts.watches;
         resolve(target)
       }
     }
@@ -237,7 +238,7 @@ module.exports.build = function (spec, opts){
         var target = {};
         var watches = [];
         opts.emitter.on('change', changeHandler(target, resolve, reject));
-        _buildRecursive(client, target, spec, opts || {}, [], watches, true);
+        _buildRecursive(client, target, spec, opts || {}, []);
       });
     });
 }
@@ -251,7 +252,7 @@ module.exports.service = function (name, opts) {
 }
 
 module.exports.close = function(cfg) {
-  for (var watch in cfg.__watches) {
+  for (var watch in cfg.__watches__) {
     watch.end()
   }
 }
