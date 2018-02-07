@@ -176,7 +176,7 @@ function _isObject(o) {
   return true;
 }
 
-function _buildRecursive (client, target, spec, opts, path) {
+function _buildRecursive (client, target, spec, opts, path, watches, is_top) {
   for(var key in spec){
     var val = spec[key]
     if (val instanceof _Value) {
@@ -185,13 +185,16 @@ function _buildRecursive (client, target, spec, opts, path) {
       target[key] = {};
       val.apply(client, path, key, target, opts);
       if (val.extensions) {
-        _buildRecursive(client, target[key], val.extensions, opts, path.concat([key]));
+        _buildRecursive(client, target[key], val.extensions, opts, path.concat([key]), watches, false);
       }
     } else  if (_isObject(val)) {
-      target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]));
+      target[key] = _buildRecursive(client, {}, spec[key], opts, path.concat([key]), watches, false);
     } else {
       target[key] = val;
     }
+  }
+  if (is_top) {
+    target.__watches = watches
   }
   return target;
 }
@@ -232,8 +235,9 @@ module.exports.build = function (spec, opts){
     }).then(function() {
       return new Promise(function(resolve, reject) {
         var target = {};
+        var watches = [];
         opts.emitter.on('change', changeHandler(target, resolve, reject));
-        _buildRecursive(client, target, spec, opts || {}, []);
+        _buildRecursive(client, target, spec, opts || {}, [], watches, true);
       });
     });
 }
@@ -244,4 +248,10 @@ module.exports.value = function (opts){
 
 module.exports.service = function (name, opts) {
   return new _Service(name, (opts || {}));
+}
+
+module.exports.close = function(cfg) {
+  for (var watch in cfg.__watches) {
+    watch.end()
+  }
 }

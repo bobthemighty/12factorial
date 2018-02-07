@@ -174,7 +174,7 @@ describe('When a value is present in consul', function () {
   }
 
   it('should use the value from consul', function(done) {
-    config.build(consulCfg, {consul: {prefix: 'myapp'}})
+    config.build(consulCfg, {consul: {prefix: '12factorial/myapp', host: 'localhost'}})
       .then(function (result){
         expect(result.value).toBe('saussignac');
         done();
